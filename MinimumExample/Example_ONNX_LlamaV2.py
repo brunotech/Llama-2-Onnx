@@ -58,20 +58,20 @@ def run_onnx_llamav2(
     data_type_str = llm_session.get_inputs()[0].type
     if data_type_str == "tensor(float16)":
         data_type = np.float16
-    elif data_type_str == "tensor(float32)" or data_type_str == "tensor(float)":
+    elif data_type_str in ["tensor(float32)", "tensor(float)"]:
         data_type = np.float32
     else:
         raise Exception(f"Unknown data type {data_type_str}")
 
     # Get the relevant shapes so we can create the inputs
     for inputs_meta in llm_session._inputs_meta:
-        if inputs_meta.name == "x":
-            x_shape = inputs_meta.shape
-        elif inputs_meta.name == "attn_mask":
+        if inputs_meta.name == "attn_mask":
             attn_mask_shape = inputs_meta.shape
         elif inputs_meta.name == "k_cache":
             k_cache_shape = inputs_meta.shape
 
+        elif inputs_meta.name == "x":
+            x_shape = inputs_meta.shape
     hidden_size = x_shape[2]
     max_seq_len = attn_mask_shape[1]
     n_layers = k_cache_shape[1]
@@ -103,7 +103,7 @@ def run_onnx_llamav2(
     # Iteratively generate tokens.
     pos = np.array(0)
     output_tokens = []
-    for idx in range(max_gen_len):
+    for _ in range(max_gen_len):
         results = llm_session.run(
             None,
             {
@@ -134,9 +134,7 @@ def run_onnx_llamav2(
         x = embedding_layer(torch.tensor(next_token)).unsqueeze(0)
         x = x.cpu().detach().numpy().astype(data_type)
 
-    output_str = tokenizer.decode(torch.tensor(output_tokens).tolist())
-
-    return output_str
+    return tokenizer.decode(torch.tensor(output_tokens).tolist())
 
 
 if __name__ == "__main__":

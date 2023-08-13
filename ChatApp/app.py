@@ -126,7 +126,6 @@ def change_model_listener(new_model_name):
     logging.info(f"Creating a new model [{new_model_name}]")
     if new_model_name == empty_stub_model_name:
         interface = EmptyStubInterface()
-        interface.initialize()
     else:
         d = available_models[new_model_name]
         interface = LlamaOnnxInterface(
@@ -134,25 +133,18 @@ def change_model_listener(new_model_name):
             tokenizer_path=d["tokenizer_path"],
             embedding_file=d["embedding_file"],
         )
-        interface.initialize()
-
+    interface.initialize()
     return new_model_name
 
 
 def interface_predict(*args):
     global interface
-    res = interface.predict(*args)
-
-    for x in res:
-        yield x
+    yield from interface.predict(*args)
 
 
 def interface_retry(*args):
     global interface
-    res = interface.retry(*args)
-
-    for x in res:
-        yield x
+    yield from interface.retry(*args)
 
 
 with gr.Blocks(css=custom_css, theme=small_and_beautiful_theme) as demo:
