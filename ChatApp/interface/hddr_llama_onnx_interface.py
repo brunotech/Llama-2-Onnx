@@ -135,24 +135,22 @@ a conversation with you.\n[|AI|]Sure, I am happy to answer most questions\
  take turns.\n[|Human|]Great, can we also keep answers short\n[|AI|]Yes, \
 short answers are usually best"
 
-        history = ["\n[|Human|]{}\n[|AI|]{}".format(x[0], x[1]) for x in history]
-        history.append("\n[|Human|]{}\n[|AI|]".format(text))
+        history = [f"\n[|Human|]{x[0]}\n[|AI|]{x[1]}" for x in history]
+        history.append(f"\n[|Human|]{text}\n[|AI|]")
         history_text = ""
         flag = False
         for x in history[::-1]:
-            # tokens = self.tokenizer.encode(text, bos=True, eos=False)
             if (
                 len(
                     self.tokenizer.encode(
                         prompt + history_text + x, bos=True, eos=False
                     )
                 )
-                <= max_length
+                > max_length
             ):
-                history_text = x + history_text
-                flag = True
-            else:
                 break
+            history_text = x + history_text
+            flag = True
         if flag:
             return prompt + history_text, torch.tensor(
                 self.tokenizer.encode(prompt + history_text, bos=True, eos=False)
@@ -170,7 +168,7 @@ short answers are usually best"
         if temperature == 0 or sampling_method == "greedy":
             next_token = np.argmax(logits, axis=-1).astype(np.int64)
 
-        elif sampling_method == "top_k" or sampling_method == "top_p":
+        elif sampling_method in {"top_k", "top_p"}:
             assert sampling_value is not None
 
             # temperature, converting to probabilities and sorting are common to both top-k and top-p
@@ -187,7 +185,7 @@ short answers are usually best"
             # find the index of interest for each of the methods.
             if sampling_method == "top_k":
                 index_of_interest = int(sampling_value)
-            elif sampling_method == "top_p":
+            else:
                 p = sampling_value
                 cumulative_probs = np.cumsum(sorted_probs, axis=-1)
                 # find the value of the first cumalitive probability that exceeds p
@@ -231,7 +229,7 @@ short answers are usually best"
             .astype(self.data_type)
         )
 
-        for i in range(max_length):
+        for _ in range(max_length):
             results = self.llm_session.run(
                 None,
                 {
@@ -275,7 +273,7 @@ short answers are usually best"
 
             yield text
 
-            if any([x in text for x in stop_words]):
+            if any(x in text for x in stop_words):
                 del logits
                 gc.collect()
                 return
@@ -353,8 +351,6 @@ short answers are usually best"
                     return
                 except Exception as e:
                     print(type(e).__name__, e)
-                    pass
-
         del input_ids
         gc.collect()
         torch.cuda.empty_cache()
@@ -363,8 +359,6 @@ short answers are usually best"
             yield a, b, "Generate: Success"
         except Exception as e:
             print(type(e).__name__, e)
-            pass
-
         return
 
     def retry(
@@ -383,7 +377,7 @@ short answers are usually best"
             return
         chatbot.pop()
         inputs = history.pop()[0]
-        for x in self.predict(
+        yield from self.predict(
             inputs,
             chatbot,
             history,
@@ -391,5 +385,4 @@ short answers are usually best"
             temperature,
             max_length_tokens,
             max_context_length_tokens,
-        ):
-            yield x
+        )
